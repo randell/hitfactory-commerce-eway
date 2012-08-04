@@ -1,0 +1,6 @@
+name = Commerce eWAY
+description = Implements eWay payment services for Drupal Commerce.
+dependencies[] = commerce
+dependencies[] = commerce_payment
+core = 7.x
+version = "7.x-0.0"
