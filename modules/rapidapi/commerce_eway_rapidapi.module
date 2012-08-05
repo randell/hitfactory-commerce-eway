@@ -8,11 +8,11 @@
 /**
  * Implements hook_commerce_payment_method_info().
  */
-function commerce_eway_commerce_payment_method_info() {
+function commerce_eway_rapidapi_commerce_payment_method_info() {
   $payment_methods = array();
 
-  $payment_methods['eway_rapid_api'] = array(
-    'base' => 'commerce_eway_rapid_api',
+  $payment_methods['eway_rapidapi'] = array(
+    'base' => 'commerce_eway_rapidapi',
     'title' => t('eWAY Rapid API'),
     'short_title' => t('eWAY Rapid API payments'),
     'display_title' => t('Credit card'),
@@ -21,4 +21,34 @@ function commerce_eway_commerce_payment_method_info() {
   );
 
   return $payment_methods;
+}
+
+/**
+ * Payment method callback: checkout form.
+ */
+function commerce_eway_rapidapi_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+	// Ensure field for CVN is added.
+  $fields = array(
+    'code' => '',
+  );
+
+  return commerce_payment_credit_card_form($fields);
+}
+
+/**
+ * Payment method callback: checkout form validation.
+ */
+function commerce_eway_rapidapi_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
+  module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+
+  // Validate the credit card fields.
+  $settings = array(
+    'form_parents' => array_merge($form_parents, array('credit_card')),
+  );
+
+  if (!commerce_payment_credit_card_validate($pane_values['credit_card'], $settings)) {
+    return FALSE;
+  }
 }
