@@ -90,3 +90,30 @@ function commerce_eway_rapidapi_submit_form_validate($payment_method, $pane_form
     return FALSE;
   }
 }
+
+/**
+ * Payment method callback: checkout form submission.
+ */
+function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, $pane_values, $order, $charge) {
+
+	//dpm($pane_values);
+	//dpm($order);
+
+	// Create and populate the request object.
+	$request = array();
+
+	// Make CreateAccessCode request
+	if ($response = hf_eway_soap_request($payment_method, $request)) {
+		$response = $response->CreateAccessCodeResult;
+
+    // POST the card data if we have an access code.
+    if (isset($response->AccessCode) && !empty($response->AccessCode)) {
+
+    }
+	}
+	else {
+    drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
+    return FALSE;
+  }
+
+}
