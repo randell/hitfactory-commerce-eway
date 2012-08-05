@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Implements eWay Rapid API payment services for Drupal Commerce.
+ */
+
+/**
+ * Implements hook_commerce_payment_method_info().
+ */
+function commerce_eway_commerce_payment_method_info() {
+  $payment_methods = array();
+
+  $payment_methods['eway_rapid_api'] = array(
+    'base' => 'commerce_eway_rapid_api',
+    'title' => t('eWAY Rapid API'),
+    'short_title' => t('eWAY Rapid API payments'),
+    'display_title' => t('Credit card'),
+    'description' => t('Allows payments via the eWAY Rapid API.'),
+  	'offsite' => FALSE,
+  );
+
+  return $payment_methods;
+}
