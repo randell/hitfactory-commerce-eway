@@ -21,10 +21,10 @@ function commerce_eway_url($payment_method, $type) {
 
   switch($method) {
   	case 'rapidapi_endpoint':
-  		$url = 'https://' . $country . 'ewaypayments.com/hotpotato/soap.asmx?wsdl';
+  		$url = 'https://' . $country . '.ewaypayments.com/hotpotato/soap.asmx?wsdl';
   	break;
   	case 'rapidapi_payment':
-  		$url = 'https://' . $country . 'ewaypayments.com/hotpotato/payment';
+  		$url = 'https://' . $country . '.ewaypayments.com/hotpotato/payment';
   	break;
   }
 
