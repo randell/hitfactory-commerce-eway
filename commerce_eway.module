@@ -3,3 +3,30 @@
  * @file
  * Implements eWAY payments for Drupal Commerce.
  */
+
+ /**
+ * Returns an eWAY request URL.
+ *
+ * @param $payment_method
+ * Payment method ID
+ *
+ * @param $type
+ * Type of request e.g. 'endpoint' or 'payment'
+ */
+function commerce_eway_url($payment_method, $type) {
+
+  // TODO: Get country from payment method settings.
+  $country = 'au';
+  $method = $payment_method . '_' . $type;
+
+  switch($method) {
+  	case 'rapidapi_endpoint':
+  		$url = 'https://' . $country . 'ewaypayments.com/hotpotato/soap.asmx?wsdl';
+  	break;
+  	case 'rapidapi_payment':
+  		$url = 'https://' . $country . 'ewaypayments.com/hotpotato/payment';
+  	break;
+  }
+
+  return $url;
+}
