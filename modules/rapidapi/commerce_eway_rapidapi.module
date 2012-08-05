@@ -39,6 +39,8 @@ function commerce_eway_rapidapi_default_settings() {
  * Payment method callback: settings form.
  */
 function commerce_eway_rapidapi_settings_form($settings = NULL) {
+	$settings += commerce_eway_rapidapi_default_settings();
+
 	$form = array();
 
   $form['customer_id'] = array(
