@@ -1,5 +1,6 @@
 name = Commerce eWAY
 description = Implements eWay payment services for Drupal Commerce.
+package = Commerce (eWAY)
 dependencies[] = commerce
 dependencies[] = commerce_ui
 dependencies[] = commerce_payment
