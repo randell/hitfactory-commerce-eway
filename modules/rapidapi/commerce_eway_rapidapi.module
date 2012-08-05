@@ -24,6 +24,30 @@ function commerce_eway_rapidapi_commerce_payment_method_info() {
 }
 
 /**
+ * Payment method callback: settings form.
+ */
+function commerce_eway_rapidapi_settings_form($settings = NULL) {
+	$form = array();
+
+  $form['customer_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Customer ID'),
+    '#default_value' => $settings['customer_id'],
+  );
+  $form['username'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username'),
+    '#default_value' => $settings['username'],
+  );
+  $form['password'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Password'),
+    '#default_value' => $settings['password'],
+  );
+	return $form;
+}
+
+/**
  * Payment method callback: checkout form.
  */
 function commerce_eway_rapidapi_submit_form($payment_method, $pane_values, $checkout_pane, $order) {

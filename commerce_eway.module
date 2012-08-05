@@ -30,3 +30,48 @@ function commerce_eway_url($payment_method, $type) {
 
   return $url;
 }
+
+/**
+ * Submits a SOAP request to an eWay endpoint.
+ *
+ * @param $payment_method
+ *   The payment method instance array associated with this API request.
+ * @param $request_method
+ *   eWAY request method e.g. CreateAccessCode
+ * @param $type
+ * Type of request e.g. 'endpoint' or 'payment'
+  * @param $mode
+ * Transaction mode e.g. 'live' or 'sandbox'
+ * @param $request
+ *   The request object containing the parameters of the requested services.
+ *
+ * @return
+ *   The response object from the API with properties pertinent to the requested
+ *     services.
+ */
+function commerce_eway_soap_request($payment_method, $request_method, $type, $request) {
+
+	// Get the API endpoint URL for the method's transaction mode.
+  $url = commerce_eway_url($payment_method, $type);
+
+  // Add Customer ID, Username and Password to the request object.
+  $request['Authentication']['CustomerID'] = HF_EWAY_SANDBOX_CUSTOMER_ID;
+  $request['Authentication']['Username'] = HF_EWAY_SANDBOX_USERNAME;
+  $request['Authentication']['Password'] = HF_EWAY_SANDBOX_PASSWORD;
+
+  // TODO: Log the request.
+
+  // Attempt the SOAP request.
+  try {
+    $soapClient = new SoapClient($url, array());
+    $response = $soapClient->CreateAccessCode(array('request' => $request));
+  }
+  catch (SoapFault $exception) {
+    watchdog('hf_eway_rapid_api', 'SoapFault: !exception', array('!exception' => '<pre>' . print_r($exception, TRUE) . '</pre>'), WATCHDOG_ERROR);
+    return FALSE;
+  }
+
+  // TODO: Log the response.
+
+  return $response;
+}
