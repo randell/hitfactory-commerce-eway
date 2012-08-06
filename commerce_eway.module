@@ -64,10 +64,14 @@ function commerce_eway_soap_request($payment_method, $request_method, $type, $re
   // Attempt the SOAP request.
   try {
     $soapClient = new SoapClient($url, array());
-    $response = $soapClient->CreateAccessCode(array('request' => $request));
+    switch($request_method) {
+    	case 'CreateAccessCode':
+    		$response = $soapClient->CreateAccessCode(array('request' => $request));
+    	break;
+    }
   }
   catch (SoapFault $exception) {
-    watchdog('hf_eway_rapid_api', 'SoapFault: !exception', array('!exception' => '<pre>' . print_r($exception, TRUE) . '</pre>'), WATCHDOG_ERROR);
+    watchdog('commerce_eway_rapidapi', 'SoapFault: !exception', array('!exception' => '<pre>' . print_r($exception, TRUE) . '</pre>'), WATCHDOG_ERROR);
     return FALSE;
   }
 

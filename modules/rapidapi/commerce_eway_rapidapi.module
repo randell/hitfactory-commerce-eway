@@ -31,7 +31,7 @@ function commerce_eway_rapidapi_default_settings() {
     'customer_id' => '',
     'username' => '',
     'password' => '',
-    //'log' => array('request' => 0, 'response' => 0),
+    'log' => array('request' => 0, 'response' => 0),
   );
 }
 
