@@ -57,11 +57,6 @@ function commerce_eway_soap_request($payment_method, $request_method, $type, $re
   $function = 'commerce_' . 'eway_rapidapi' . '_default_settings';
   $settings = $function();
 
-  // Add Customer ID, Username and Password to the request object.
-  $request['Authentication']['CustomerID'] = $settings['customer_id'];
-  $request['Authentication']['Username'] = $settings['username'];
-  $request['Authentication']['Password'] = $settings['password'];
-
   // TODO: Log the request.
   if ($payment_method['settings']['log']['request'] == 'request') {
   }
