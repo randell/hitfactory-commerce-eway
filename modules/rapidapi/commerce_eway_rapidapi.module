@@ -58,6 +58,15 @@ function commerce_eway_rapidapi_settings_form($settings = NULL) {
     '#title' => t('Password'),
     '#default_value' => $settings['password'],
   );
+  $form['log'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Log the following messages for debugging'),
+    '#options' => array(
+      'request' => t('API request messages'),
+      'response' => t('API response messages'),
+    ),
+    '#default_value' => $settings['log'],
+  );
 	return $form;
 }
 
