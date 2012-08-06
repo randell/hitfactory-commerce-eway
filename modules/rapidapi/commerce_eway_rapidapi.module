@@ -112,7 +112,7 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 	$request = array();
 
 	// Make CreateAccessCode request
-	if ($response = hf_eway_soap_request($payment_method, $request)) {
+	if ($response = commerce_eway_soap_request($payment_method, 'CreateAccessCode', 'endpoint', $request)) {
 		$response = $response->CreateAccessCodeResult;
 
     // POST the card data if we have an access code.
