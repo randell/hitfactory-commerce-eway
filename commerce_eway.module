@@ -69,7 +69,7 @@ function commerce_eway_soap_request($payment_method, $request_method, $type, $re
     }
   }
   catch (SoapFault $exception) {
-    watchdog('commerce_eway_rapidapi', 'SoapFault: !exception', array('!exception' => '<pre>' . print_r($exception, TRUE) . '</pre>'), WATCHDOG_ERROR);
+    watchdog('commerce_eway', 'SoapFault: !exception', array('!exception' => '<pre>' . print_r($exception, TRUE) . '</pre>'), WATCHDOG_ERROR);
     return FALSE;
   }
 
