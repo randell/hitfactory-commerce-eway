@@ -164,9 +164,12 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     	$response = drupal_http_request($post_url, $post);
 
     	if ($response) {
-    		// Make CreateAccessCodeResult request.
+    		// Make GetAccessCodeResult request.
     		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
-					$response = $response->CreateAccessCodeResult;
+					$response = $response->GetAccessCodeResult;
+					$transaction_id = (string)$response->TransactionID;
+					$transaction_status = (string)$response->TransactionStatus;
+
 				}
     	}
 
