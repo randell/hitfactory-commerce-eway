@@ -110,8 +110,6 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
 	global $base_url;
 
-	watchdog('commerce_eway_rapidapi', 'payment method: @vars', array('@vars' => '<pre>' . print_r($payment_method, TRUE) . '</pre>'));
-
 	$order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
 	// Create and populate the request object.
