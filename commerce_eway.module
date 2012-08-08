@@ -71,6 +71,8 @@ function commerce_eway_soap_request($payment_method, $request_method, $type, $re
     	case 'CreateAccessCode':
     		$response = $soapClient->CreateAccessCode(array('request' => $request));
     	break;
+    	case 'GetAccessCodeResult':
+    		$response = $soapClient->GetAccessCodeResult(array('request' => $request));
     }
   }
   catch (SoapFault $exception) {

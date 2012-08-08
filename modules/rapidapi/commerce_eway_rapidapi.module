@@ -145,6 +145,9 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   }
 
   // Add Billing Information.
+
+  // Extract Title from billing address.
+  $request['Customer']['Title'] = 'Ms.';
   $request['Customer']['FirstName'] = $billing_address['first_name'];
   $request['Customer']['LastName'] = $billing_address['last_name'];
   $request['Customer']['Street1'] = $billing_address['thoroughfare'];
