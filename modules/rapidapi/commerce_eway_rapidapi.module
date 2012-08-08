@@ -153,6 +153,9 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   $request['Customer']['PostalCode'] = $billing_address['postal_code'];
   $request['Customer']['Country'] = $billing_address['country'];
 
+
+  $request['Customer']['SaveToken'] = 'false';
+
   $request['ResponseMode'] = 'Return';
   // TODO: Is this needed when ResponseMode is Return?
   $request['RedirectUrl'] = $base_url;
