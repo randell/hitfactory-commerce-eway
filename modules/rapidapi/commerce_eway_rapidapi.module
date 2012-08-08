@@ -170,8 +170,12 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
       $post['EWAY_CARDYEAR'] = $pane['values']['credit_card']['exp_year'];
       $post['EWAY_CARDCVN'] = $pane['values']['credit_card']['code'];
 
+      foreach ($post as $key => $value) {
+      	$variables[] = $key . '=' . urlencode(stripslashes($value));
+    	}
+
     	$post_url = commerce_eway_url($payment_method, 'payment');
-    	$result = drupal_http_request($post_url, $post);
+    	$result = drupal_http_request($post_url, array(), 'POST', implode('&', $variables));
 
     	if ($result->data) {
     		// Make GetAccessCodeResult request.
