@@ -187,8 +187,7 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
       	watchdog('commerce_eway_rapidapi', 'Attempt to post card date to eWAY failed with error @code: @error', array('@code' => $response->code, '@error' => $response->error), WATCHDOG_ERROR);
     		$transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
     	}
-
-    	if ($result->data) {
+    	else {
     		// Make GetAccessCodeResult request.
     		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
 
