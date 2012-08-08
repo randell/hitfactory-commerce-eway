@@ -118,8 +118,18 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   $request['Authentication']['Username'] = $payment_method['settings']['username'];
   $request['Authentication']['Password'] = $payment_method['settings']['password'];
 
+  // Build a description for the order.
+  $description = array();
+
+  foreach ($order_wrapper->commerce_line_items as $delta => $line_item_wrapper) {
+    if (in_array($line_item_wrapper->type->value(), commerce_product_line_item_types())) {
+      $description[] = round($line_item_wrapper->quantity->value(), 2) . 'x ' . $line_item_wrapper->line_item_label->value();
+    }
+  }
+
   // Add Payment data.
-  $request['Payment']['TotalAmount'] = '';
+  $request['Payment']['TotalAmount'] = $charge['amount'];
+  $request['Payment']['InvoiceDescription'] = substr(implode(', ', $description), 0, 127);
 
   // Get the billing address for use in the request.
   $billing_address = $order_wrapper->commerce_customer_billing->commerce_customer_address->value();
@@ -161,26 +171,50 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
       $post['EWAY_CARDCVN'] = $pane['values']['credit_card']['code'];
 
     	$post_url = commerce_eway_url($payment_method, 'payment');
-    	$response = drupal_http_request($post_url, $post);
+    	$result = drupal_http_request($post_url, $post);
 
-    	if ($response) {
+    	if ($result->data) {
     		// Make GetAccessCodeResult request.
     		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
-					$response = $response->GetAccessCodeResult;
-					$transaction_id = (string)$response->TransactionID;
-					$transaction_status = (string)$response->TransactionStatus;
+
+					// Prepare a transaction object to log the API response.
+  				$transaction = commerce_payment_transaction_new('paypal_wpp', $order->order_id);
+  				$transaction->instance_id = $payment_method['instance_id'];
+  				$transaction->amount = $charge['amount'];
+
+					$response = $response->GetAccessCodeResultResult;
+
+					// Set transaction status based on response.
+					$transaction->status = (string)$response->TransactionStatus ? COMMERCE_PAYMENT_STATUS_SUCCESS : COMMERCE_PAYMENT_STATUS_FAILURE;
+
+					$transaction->remote_id = (string)$response->TransactionID;
+
+					// Build a meaningful response message based on the response code.
+  				$message = array();
+  				$message[] = t('Response @code: @message', array('@code' => $response->ResponseCode, '@message' => $response->ResponseMessage));
+
+  				// Set the message.
+  				$transaction->message = implode('<br />', $message);
+
+  				// Save the transaction information.
+  				commerce_payment_transaction_save($transaction);
 
 				}
     	}
-
-
-
-
     }
 	}
 	else {
     drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
     return FALSE;
   }
+}
 
+/**
+ * Returns a response message given a response code.
+ */
+function commerce_eway_rapidapi_response_message($code) {
+	switch($code) {
+		case '00':
+		break;
+	}
 }
