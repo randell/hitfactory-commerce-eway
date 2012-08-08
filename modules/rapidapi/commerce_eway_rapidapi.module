@@ -199,6 +199,15 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     		$transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
     	}
     	else {
+
+    		// Prepare request array
+ 				$request = array();
+			  $request['Authentication']['CustomerID'] = $payment_method['settings']['customer_id'];
+			  $request['Authentication']['Username'] = $payment_method['settings']['username'];
+			  $request['Authentication']['Password'] = $payment_method['settings']['password'];
+			  $request['AccessCode'] = $access_code;
+
+
     		// Make GetAccessCodeResult request.
     		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
 
