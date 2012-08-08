@@ -177,14 +177,20 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     	$post_url = commerce_eway_url($payment_method, 'payment');
     	$result = drupal_http_request($post_url, array(), 'POST', implode('&', $variables));
 
+    	// Prepare a transaction object to log the API response.
+			$transaction = commerce_payment_transaction_new('eway_rapidapi', $order->order_id);
+			$transaction->instance_id = $payment_method['instance_id'];
+			$transaction->amount = $charge['amount'];
+
+    	// If an error occurred during processing, log the message and exit.
+    	if (property_exists($response, 'error')) {
+      	watchdog('commerce_eway_rapidapi', 'Attempt to post card date to eWAY failed with error @code: @error', array('@code' => $response->code, '@error' => $response->error), WATCHDOG_ERROR);
+    		$transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+    	}
+
     	if ($result->data) {
     		// Make GetAccessCodeResult request.
     		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
-
-					// Prepare a transaction object to log the API response.
-  				$transaction = commerce_payment_transaction_new('paypal_wpp', $order->order_id);
-  				$transaction->instance_id = $payment_method['instance_id'];
-  				$transaction->amount = $charge['amount'];
 
 					$response = $response->GetAccessCodeResultResult;
 
@@ -197,15 +203,15 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   				$message = array();
   				$message[] = t('Response @code: @message', array('@code' => $response->ResponseCode, '@message' => $response->ResponseMessage));
 
-  				// Set the message.
-  				$transaction->message = implode('<br />', $message);
-
-  				// Save the transaction information.
-  				commerce_payment_transaction_save($transaction);
-
 				}
     	}
     }
+
+    // Set the message.
+		$transaction->message = implode('<br />', $message);
+
+		// Save the transaction information.
+		commerce_payment_transaction_save($transaction);
 	}
 	else {
     drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
