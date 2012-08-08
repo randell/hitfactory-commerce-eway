@@ -158,7 +158,7 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   $request['RedirectUrl'] = $base_url;
 
 	// Make CreateAccessCode request
-	if ($response = commerce_eway_soap_request('rapidapi', 'CreateAccessCode', 'endpoint', $request)) {
+	if ($response = commerce_eway_soap_request($payment_method, 'CreateAccessCode', 'endpoint', $request)) {
 		$response = $response->CreateAccessCodeResult;
 
     // POST the card data if we have an access code.
@@ -193,7 +193,7 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     	}
     	else {
     		// Make GetAccessCodeResult request.
-    		if ($response = commerce_eway_soap_request('rapidapi', 'GetAccessCodeResult', 'endpoint', $request)) {
+    		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
 
 					$response = $response->GetAccessCodeResultResult;
 

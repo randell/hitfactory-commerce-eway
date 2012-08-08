@@ -7,17 +7,17 @@
  /**
  * Returns an eWAY request URL.
  *
- * @param $payment_method
+ * @param $method_id
  * Payment method ID
  *
  * @param $type
  * Type of request e.g. 'endpoint' or 'payment'
  */
-function commerce_eway_url($payment_method, $type) {
+function commerce_eway_url($method_id, $type) {
 
   // TODO: Get country from payment method settings.
   $country = 'au';
-  $method = $payment_method . '_' . $type;
+  $method = $method_id . '_' . $type;
 
   switch($method) {
   	case 'rapidapi_endpoint':
@@ -52,7 +52,12 @@ function commerce_eway_url($payment_method, $type) {
 function commerce_eway_soap_request($payment_method, $request_method, $type, $request) {
 
 	// Get the API endpoint URL for the method's transaction mode.
-  $url = commerce_eway_url($payment_method, $type);
+	$method_id = $payment_method['method_id'];
+
+	// TODO: Extract eWAY method
+	$eway_method = 'rapidapi';
+
+  $url = commerce_eway_url($eway_method, $type);
 
   // TODO: Log the request.
   if ($payment_method['settings']['log']['request'] == 'request') {
