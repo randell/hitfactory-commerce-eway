@@ -155,6 +155,7 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
 
   $request['Customer']['SaveToken'] = 'false';
+  $request['Action'] = 'ProcessPayment';
 
   $request['ResponseMode'] = 'Return';
   // TODO: Is this needed when ResponseMode is Return?
