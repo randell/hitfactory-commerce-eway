@@ -175,11 +175,11 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
     	$post = array();
       $post['EWAY_ACCESSCODE'] = $access_code;
-      $post['EWAY_CARDNAME'] = $pane['values']['credit_card']['owner'];
-      $post['EWAY_CARDNUMBER'] = $pane['values']['credit_card']['number'];
-      $post['EWAY_CARDMONTH'] = $pane['values']['credit_card']['exp_month'];
-      $post['EWAY_CARDYEAR'] = $pane['values']['credit_card']['exp_year'];
-      $post['EWAY_CARDCVN'] = $pane['values']['credit_card']['code'];
+      $post['EWAY_CARDNAME'] = $pane_values['credit_card']['owner'];
+      $post['EWAY_CARDNUMBER'] = $pane_values['credit_card']['number'];
+      $post['EWAY_CARDMONTH'] = $pane_values['credit_card']['exp_month'];
+      $post['EWAY_CARDYEAR'] = $pane_values['credit_card']['exp_year'];
+      $post['EWAY_CARDCVN'] = $pane_values['credit_card']['code'];
 
       foreach ($post as $key => $value) {
       	$variables[] = $key . '=' . urlencode(stripslashes($value));
