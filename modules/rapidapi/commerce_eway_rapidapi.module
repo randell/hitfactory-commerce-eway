@@ -110,8 +110,6 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
 	global $base_url;
 
-	watchdog('commerce_eway_rapidapi', 'payment method: @vars', array('@vars' => '<pre>' . print_r($payment_method, TRUE) . '</pre>'));
-
 	$order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
 	// Create and populate the request object.
@@ -212,15 +210,33 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
 					$response = $response->GetAccessCodeResultResult;
 
-					// Set transaction status based on response.
-					$transaction->status = (string)$response->TransactionStatus ? COMMERCE_PAYMENT_STATUS_SUCCESS : COMMERCE_PAYMENT_STATUS_FAILURE;
+          if ($payment_method['settings']['log']['response'] == 'response') {
+            watchdog('commerce_eway_rapidapi', 'Response to GetAccessCodeResult request: @vars', array('@vars' => print_r($response, TRUE)));
+          }
+
+          switch ($response->ResponseCode) {
+            case '00':
+            case '08':
+            case '11':
+            case '16':
+              $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
+              break;
+            default:
+              $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
+          }
 
 					$transaction->remote_id = (string)$response->TransactionID;
+
+          // Save response and masked credit card details
+          // as payload of transaction.
+          $payload = (array) $response;
+          $payload['EWAY_CARDNAME'] = $post['EWAY_CARDNAME'];
+          $payload['EWAY_CARDNUMBER'] = str_repeat('X', strlen($post['EWAY_CARDNUMBER']) - 4) . substr($post['EWAY_CARDNUMBER'], -4);
+          $transaction->payload = $payload;
 
 					// Build a meaningful response message based on the response code.
   				$message = array();
   				$message[] = t('Response @code: @message', array('@code' => $response->ResponseCode, '@message' => $response->ResponseMessage));
-
 				}
     	}
     }
@@ -232,6 +248,11 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
 		// Save the transaction information.
 		commerce_payment_transaction_save($transaction);
+
+    if ($transaction->status == COMMERCE_PAYMENT_STATUS_FAILURE) {
+      drupal_set_message(t('Your transaction could not be processed. Please contact your merchant for details.'), 'error');
+      return FALSE;
+    }
 	}
 	else {
     drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
