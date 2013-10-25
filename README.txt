@@ -1,4 +1,4 @@
 Description
 ===========
 
-Implements eWAY payments for Drupal Commerce.
+Implements eWAY Rapid API 3.0 payments for Drupal Commerce.

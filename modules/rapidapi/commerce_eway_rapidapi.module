@@ -1,37 +1,162 @@
 <?php
-
 /**
  * @file
  * Implements eWay Rapid API payment services for Drupal Commerce.
  */
 
+// eWAY Rapid transaction modes.
+define('EWAY_RAPIDAPI_TXN_MODE_LIVE', 'live');
+define('EWAY_RAPIDAPI_TXN_MODE_SANDBOX', 'sandbox');
+
+/**
+ * Returns an eWAY Rapid API endpoint for a HTTP POST (JSON) request.
+ *
+ * @param $txn_mode
+ *  Transaction mode e.g. 'live' or 'sandbox'
+ * @param $request_method
+ *  eWAY request method e.g. CreateAccessCode
+ * @return $url
+ *  The URL to submit requests to the eWAY server.
+ */
+function commerce_eway_rapidapi_endpoint($txn_mode = 'sandbox', $request_method) {
+  switch ($txn_mode) {
+    case EWAY_RAPIDAPI_TXN_MODE_LIVE:
+      $url = 'https://api.ewaypayments.com/';
+      break;
+    case EWAY_RAPIDAPI_TXN_MODE_SANDBOX:
+      $url = 'https://api.sandbox.ewaypayments.com/';
+      break;
+  }
+  return $url . $request_method . '.json';
+}
+
+/**
+ * Submits a HTTP POST (JSON) request to an eWay endpoint.
+ *
+ * @param $payment_method
+ *   The payment method instance array associated with this API request.
+ * @param $request_method
+ *   eWAY request method e.g. CreateAccessCode
+ * @param $request
+ *   The request object containing the parameters of the requested services.
+ *
+ * @return
+ *   The response object from the API with properties pertinent to the requested
+ *     services.
+ */
+function commerce_eway_rapidapi_http_post_request($payment_method, $request_method, $request) {
+
+  $txn_mode = $payment_method['settings']['txn_mode'];
+  $url = commerce_eway_rapidapi_endpoint($txn_mode, $request_method);
+
+  $json = drupal_json_encode($request);
+
+  // Log the request.
+  if ($payment_method['settings']['log']['request'] == 'request') {
+    watchdog('commerce_eway_rapidapi', 'eWAY Rapid HTTP POST (JSON) request: <pre>!param</pre>', array('!param' => print_r($json, TRUE)), WATCHDOG_DEBUG);
+  }
+
+  $authentication = 'Basic ' . base64_encode($payment_method['settings']['api_key'] . ':' . $payment_method['settings']['password']);
+
+  $headers = array(
+    'Authorization' => $authentication,
+    'Content-Type' => 'application/json',
+    'Accept' => 'application/json',
+  );
+
+  // Make the request.
+  $response = drupal_http_request($url, array(
+    'max_redirects' => 0,
+    'method' => 'POST',
+    'headers' => $headers,
+    'data' => $json,
+  ));
+
+  // Log the response if specified.
+  if ($payment_method['settings']['log']['response'] == 'response') {
+    watchdog('commerce_eway_rapidapi', 'eWAY Rapid HTTP POST (JSON) response: !param', array('!param' => '<pre>' . check_plain(print_r($response, TRUE)) . '</pre>', WATCHDOG_DEBUG));
+  }
+
+  // Check for an error in the response data.
+  if (isset($response->data)) {
+    $data = drupal_json_decode($response->data);
+    watchdog('commerce_eway_rapidapi', 'Data: <pre>@data</pre>', array('@data' => print_r($data, TRUE)), WATCHDOG_DEBUG);
+  }
+
+  if (isset($response->error) || $response->code != 200 || isset($data['Errors'])) {
+    // Log any errors.
+    $watchdog_args = array(
+      '@code' => $data['Errors'],
+      '@message' => commerce_eway_rapidapi_message($data['Errors']),
+    );
+    watchdog('commerce_eway_rapidapi', 'Error @code : @message', $watchdog_args, WATCHDOG_ERROR);
+  }
+  return $data;
+}
+
+/**
+ * Submit card data to eWAY.
+ */
+function commerce_eway_rapidapi_post_request($payment_method, $data) {
+
+  // Retrieve URL where data should be posted.
+  $url = $data['FormActionURL'];
+  unset($data['FormActionURL']);
+
+  // Allow modules to alter parameters of the API request.
+  drupal_alter('commerce_eway_rapidapi_post_request', $data);
+
+  // Log the request if specified.
+  if ($payment_method['settings']['log']['request'] == 'request') {
+    // Mask the credit card number and CVN.
+    $log_data = $data;
+    $log_data['EWAY_CARDNUMBER'] = str_repeat('X', strlen($log_data['EWAY_CARDNUMBER']) - 4) . substr($log_data['EWAY_CARDNUMBER'], -4);
+    $log_data['EWAY_CARDCVN'] = str_repeat('X', strlen($log_data['EWAY_CARDCVN']));
+
+    watchdog('commerce_eway_rapidapi', 'eWAY Rapid POST request to @url: !param', array('@url' => $url, '!param' => '<pre>' . print_r($log_data, TRUE) . '</pre>'), WATCHDOG_DEBUG);
+  }
+
+  $response = drupal_http_request($url, array(
+    'max_redirects' => 0,
+    'method' => 'POST',
+    'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+    'data' => drupal_http_build_query($data),
+  ));
+
+  // Log the response if specified.
+  if ($payment_method['settings']['log']['response'] == 'response') {
+    watchdog('commerce_eway_rapidapi', 'eWAY Rapid POST response: !param', array('!param' => '<pre>' . check_plain(print_r($response, TRUE)) . '</pre>', WATCHDOG_DEBUG));
+  }
+  return isset($response->error) ? FALSE : $response->data;
+}
+
 /**
  * Implements hook_commerce_payment_method_info().
  */
 function commerce_eway_rapidapi_commerce_payment_method_info() {
-  $payment_methods = array();
-
   $payment_methods['eway_rapidapi'] = array(
     'base' => 'commerce_eway_rapidapi',
-    'title' => t('eWAY Rapid API'),
-    'short_title' => t('eWAY Rapid API payments'),
+    'title' => t('eWAY Rapid'),
+    'short_title' => t('eWAY Rapid payments'),
     'display_title' => t('Credit card'),
     'description' => t('Allows payments via the eWAY Rapid API.'),
-  	'offsite' => FALSE,
   );
-
   return $payment_methods;
 }
 
 /**
- * Returns the default settings for the eWAY RapidAPI payment method.
+ * Returns the default settings for the eWAY Rapid payment method.
  */
 function commerce_eway_rapidapi_default_settings() {
+  $default_currency = commerce_default_currency();
   return array(
-    'customer_id' => '',
-    'username' => '',
+    'currency_code' => in_array($default_currency, array('AUD', 'GBP, NZD')) ? $default_currency : 'AUD',
+    'api_key' => '',
     'password' => '',
-    'log' => array('request' => 0, 'response' => 0),
+    'txn_mode' => EWAY_RAPIDAPI_TXN_MODE_SANDBOX,
+    'txn_type' => COMMERCE_CREDIT_AUTH_CAPTURE,
+    'card_types' => array(),
+    'log' => array('request' => '0', 'response' => '0'),
   );
 }
 
@@ -39,26 +164,54 @@ function commerce_eway_rapidapi_default_settings() {
  * Payment method callback: settings form.
  */
 function commerce_eway_rapidapi_settings_form($settings = NULL) {
-	$settings += commerce_eway_rapidapi_default_settings();
+	module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
+  $settings += commerce_eway_rapidapi_default_settings();
 
 	$form = array();
 
-	// TODO: Add setting for country
-
-  $form['customer_id'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Customer ID'),
-    '#default_value' => $settings['customer_id'],
+  $form['currency_code'] = array(
+    '#type' => 'select',
+    '#title' => t('Default currency'),
+    '#options' =>  drupal_map_assoc(array('AUD', 'GBP', 'NZD')),
+    '#default_value' => $settings['currency_code'],
   );
-  $form['username'] = array(
+
+  $form['api_key'] = array(
     '#type' => 'textfield',
-    '#title' => t('Username'),
-    '#default_value' => $settings['username'],
+    '#title' => t('API Key'),
+    '#default_value' => $settings['api_key'],
   );
   $form['password'] = array(
     '#type' => 'textfield',
     '#title' => t('Password'),
     '#default_value' => $settings['password'],
+  );
+  $form['txn_mode'] = array(
+    '#type' => 'radios',
+    '#title' => t('Transaction mode'),
+    '#description' => t('Adjust to live transactions when you are ready to start processing real payments.'),
+    '#options' => array(
+      EWAY_RAPIDAPI_TXN_MODE_LIVE => t('Live transactions in a live account'),
+      EWAY_RAPIDAPI_TXN_MODE_SANDBOX => t('Test transactions in a sandbox account'),
+    ),
+    '#default_value' => $settings['txn_mode'],
+  );
+  $form['txn_type'] = array(
+    '#type' => 'radios',
+    '#title' => t('Default credit card transaction type'),
+    '#description' => t('The default will be used to process transactions during checkout.'),
+    '#options' => array(
+      COMMERCE_CREDIT_AUTH_CAPTURE => t('Authorization and capture'),
+      COMMERCE_CREDIT_AUTH_ONLY => t('Authorization only (requires manual or automated capture after checkout)'),
+    ),
+    '#default_value' => $settings['txn_type'],
+  );
+  $form['card_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Limit accepted credit cards to the following types'),
+    '#description' => t('If you want to limit acceptable card types, you should only select those supported by your merchant account.') . '<br />' . t('If none are checked, any credit card type will be accepted.'),
+    '#options' => commerce_payment_credit_card_types(),
+    '#default_value' => $settings['card_types'],
   );
   $form['log'] = array(
     '#type' => 'checkboxes',
@@ -84,6 +237,14 @@ function commerce_eway_rapidapi_submit_form($payment_method, $pane_values, $chec
     'owner' => '',
   );
 
+  // Add the credit card types array if necessary.
+  if (isset($payment_method['settings']['card_types'])) {
+    $card_types = array_diff(array_values($payment_method['settings']['card_types']), array(0));
+
+    if (!empty($card_types)) {
+      $fields['type'] = $card_types;
+    }
+  }
   return commerce_payment_credit_card_form($fields);
 }
 
@@ -91,6 +252,7 @@ function commerce_eway_rapidapi_submit_form($payment_method, $pane_values, $chec
  * Payment method callback: checkout form validation.
  */
 function commerce_eway_rapidapi_submit_form_validate($payment_method, $pane_form, $pane_values, $order, $form_parents = array()) {
+
   module_load_include('inc', 'commerce_payment', 'includes/commerce_payment.credit_card');
 
   // Validate the credit card fields.
@@ -115,11 +277,6 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 	// Create and populate the request object.
 	$request = array();
 
-	// Add Customer ID, Username and Password to the request array.
-  $request['Authentication']['CustomerID'] = $payment_method['settings']['customer_id'];
-  $request['Authentication']['Username'] = $payment_method['settings']['username'];
-  $request['Authentication']['Password'] = $payment_method['settings']['password'];
-
   // Build a description for the order.
   $description = array();
 
@@ -129,12 +286,13 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     }
   }
 
-  $reference = substr(t('Order @number', array('@number' => $order->order_number)), 0, 256);
+  $reference = substr(t('Order @number', array('@number' => $order->order_number)), 0, 49);
 
   // Add payment data.
+  $request['Payment']['CurrencyCode'] = $charge['currency_code'];
   $request['Payment']['TotalAmount'] = $charge['amount'];
-  $request['Payment']['InvoiceDescription'] = substr(implode(', ', $description), 0, 127);
-  $request['Payment']['InvoiceNumber'] = substr($order->order_number, 0, 127) . '-' . REQUEST_TIME;
+  $request['Payment']['InvoiceDescription'] = substr(implode(', ', $description), 0, 63);
+  $request['Payment']['InvoiceNumber'] = substr($order->order_number, 0, 15);
   $request['Payment']['InvoiceReference'] = $reference;
 
   // Get the billing address for use in the request.
@@ -147,52 +305,59 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
   }
 
   // Add customer information.
-  $request['Customer']['Reference'] = $reference;
-  // TODO: Extract Title from billing address.
-  $request['Customer']['Title'] = 'Ms.';
-  $request['Customer']['FirstName'] = $billing_address['first_name'];
-  $request['Customer']['LastName'] = $billing_address['last_name'];
-  $request['Customer']['Street1'] = $billing_address['thoroughfare'];
-  $request['Customer']['City'] = $billing_address['locality'];
-  $request['Customer']['State'] =  $billing_address['administrative_area'];
-  $request['Customer']['PostalCode'] = $billing_address['postal_code'];
+  $request['Customer']['Reference'] = '';
+  $request['Customer']['Title'] = '';
+  $request['Customer']['FirstName'] = substr($billing_address['first_name'], 0, 49);
+  $request['Customer']['LastName'] = substr($billing_address['last_name'], 0, 49);
+  $request['Customer']['Street1'] = substr($billing_address['thoroughfare'], 0, 49);
+  $request['Customer']['Street2'] = substr($billing_address['premise'], 0, 49);
+  $request['Customer']['City'] = substr($billing_address['locality'], 0, 49);
+  $request['Customer']['State'] =  substr($billing_address['administrative_area'], 0, 49);
+  $request['Customer']['PostalCode'] = substr($billing_address['postal_code'], 0, 29);
   $request['Customer']['Country'] = strtolower($billing_address['country']);
-  //$request['Customer']['Email'] = 'test@eway.com.au';
+  $request['Customer']['Email'] = substr($order->mail, 0, 49);
 
-  $request['Customer']['SaveToken'] = 'false';
-  $request['Action'] = 'ProcessPayment';
+  // Get the default transaction type from the payment method settings.
+  $txn_type = $payment_method['settings']['txn_type'];
 
-  $request['ResponseMode'] = 'Return';
-  // TODO: Is this needed when ResponseMode is Return?
-  $request['RedirectUrl'] = $base_url;
+  $request['Method'] = 'ProcessPayment';
+
+  $request['RedirectUrl'] = url("checkout/$order->order_id/review", array('absolute' => TRUE));
+
+  // Allow other modules to alter the request.
+  $method = 'CreateAccessCode';
+  drupal_alter('commerce_eway_rapidapi_http_post_request', $request, $order, $method);
 
 	// Make CreateAccessCode request
-	if ($response = commerce_eway_soap_request($payment_method, 'CreateAccessCode', 'endpoint', $request)) {
-		$response = $response->CreateAccessCodeResult;
+  $response = commerce_eway_rapidapi_http_post_request($payment_method, $method, $request);
+  if (!isset($response['Errors'])) {
+
+    // Prepare a transaction object to log the API response.
+    $transaction = commerce_payment_transaction_new('eway_rapidapi', $order->order_id);
+    $transaction->instance_id = $payment_method['instance_id'];
+    $transaction->amount = $charge['amount'];
 
     // POST the card data if we have an access code.
-    if (isset($response->AccessCode) && !empty($response->AccessCode)) {
+    if (isset($response['AccessCode']) && !empty($response['AccessCode'])) {
 
-    	$access_code = (string)$response->AccessCode;
+    	$access_code = $response['AccessCode'];
 
     	$post = array();
       $post['EWAY_ACCESSCODE'] = $access_code;
       $post['EWAY_CARDNAME'] = $pane_values['credit_card']['owner'];
       $post['EWAY_CARDNUMBER'] = $pane_values['credit_card']['number'];
-      $post['EWAY_CARDMONTH'] = $pane_values['credit_card']['exp_month'];
-      $post['EWAY_CARDYEAR'] = substr($pane_values['credit_card']['exp_year'], 2,2);
+      $post['EWAY_CARDEXPIRYMONTH'] = $pane_values['credit_card']['exp_month'];
+      $post['EWAY_CARDEXPIRYYEAR'] = substr($pane_values['credit_card']['exp_year'], 2,2);
       $post['EWAY_CARDCVN'] = $pane_values['credit_card']['code'];
 
-    	// Prepare a transaction object to log the API response.
-			$transaction = commerce_payment_transaction_new('eway_rapidapi', $order->order_id);
-			$transaction->instance_id = $payment_method['instance_id'];
-			$transaction->amount = $charge['amount'];
+      // FormActionURL contains the URL where the form should be posted.
+      $post['FormActionURL'] = $response['FormActionURL'];
 
-      $result = commerce_eway_post_request($payment_method, $post);
+      $result = commerce_eway_rapidapi_post_request($payment_method, $post);
 
     	// If an error occurred during processing, log the message and exit.
     	if (!$result) {
-      	watchdog('commerce_eway_rapidapi', 'Attempt to post card date to eWAY failed with response @vars', array('@vars' => print_r($result, TRUE)), WATCHDOG_ERROR);
+      	watchdog('commerce_eway_rapidapi', 'Attempt to post card data to eWAY failed with response @vars', array('@vars' => print_r($result, TRUE)), WATCHDOG_ERROR);
     		$transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
         return FALSE;
     	}
@@ -200,44 +365,44 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
 
     		// Prepare request array
  				$request = array();
-			  $request['Authentication']['CustomerID'] = $payment_method['settings']['customer_id'];
-			  $request['Authentication']['Username'] = $payment_method['settings']['username'];
-			  $request['Authentication']['Password'] = $payment_method['settings']['password'];
 			  $request['AccessCode'] = $access_code;
 
     		// Make GetAccessCodeResult request.
-    		if ($response = commerce_eway_soap_request($payment_method, 'GetAccessCodeResult', 'endpoint', $request)) {
-
-					$response = $response->GetAccessCodeResultResult;
+        $response = commerce_eway_rapidapi_http_post_request($payment_method, 'GetAccessCodeResult', $request);
+    		if (!isset($response['Errors'])) {
 
           if ($payment_method['settings']['log']['response'] == 'response') {
             watchdog('commerce_eway_rapidapi', 'Response to GetAccessCodeResult request: @vars', array('@vars' => print_r($response, TRUE)));
           }
 
-          switch ($response->ResponseCode) {
-            case '00':
-            case '08':
-            case '11':
-            case '16':
+          switch ($response['ResponseMessage']) {
+            case 'A2000':
+            case 'A2008':
+            case 'A2010':
+            case 'A2011':
+            case 'A2016':
               $transaction->status = COMMERCE_PAYMENT_STATUS_SUCCESS;
               break;
             default:
               $transaction->status = COMMERCE_PAYMENT_STATUS_FAILURE;
           }
 
-					$transaction->remote_id = (string)$response->TransactionID;
+					$transaction->remote_id = $response['TransactionID'];
 
-          // Save response and masked credit card details
-          // as payload of transaction.
-          $payload = (array) $response;
+          // Save response and masked credit card details as payload of transaction.
+          $payload = $response;
           $payload['EWAY_CARDNAME'] = $post['EWAY_CARDNAME'];
           $payload['EWAY_CARDNUMBER'] = str_repeat('X', strlen($post['EWAY_CARDNUMBER']) - 4) . substr($post['EWAY_CARDNUMBER'], -4);
           $transaction->payload = $payload;
 
 					// Build a meaningful response message based on the response code.
   				$message = array();
-  				$message[] = t('Response @code: @message', array('@code' => $response->ResponseCode, '@message' => $response->ResponseMessage));
+  				$message[] = t('Response @code: @message', array('@code' => $response['ResponseMessage'], '@message' => commerce_eway_rapidapi_message($response['ResponseMessage'])));
 				}
+        else {
+          drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
+          return FALSE;
+        }
     	}
     }
 
@@ -258,4 +423,155 @@ function commerce_eway_rapidapi_submit_form_submit($payment_method, $pane_form, 
     drupal_set_message(t('We encountered an error contacting your payment processor. Please try submitting your payment again.'), 'error');
     return FALSE;
   }
+}
+
+/**
+ * Returns a response message for a given eWAY resonse code
+ *
+ * @param $response_code
+ *  eWAY response code e.g. A2000
+ * @param $response_message
+ *  eWAY response message
+ */
+function commerce_eway_rapidapi_message($response_code) {
+  $messages = array(
+    'F7000' => 'Undefined Fraud',
+    'V5000' => 'Undefined System',
+    'A0000' => 'Undefined Approved',
+    'A2000' => 'Transaction Approved',
+    'A2008' => 'Honour With Identification',
+    'A2010' => 'Approved For Partial Amount',
+    'A2011' => 'Approved VIP',
+    'A2016' => 'Approved Update Track 3',
+    'V6000' => 'Undefined Validation',
+    'V6001' => 'Invalid Request CustomerIP',
+    'V6002' => 'Invalid Request DeviceID',
+    'V6011' => 'Invalid Payment Amount',
+    'V6012' => 'Invalid Payment InvoiceDescription',
+    'V6013' => 'Invalid Payment InvoiceNumber',
+    'V6014' => 'Invalid Payment InvoiceReference',
+    'V6015' => 'Invalid Payment CurrencyCode',
+    'V6016' => 'Payment Required',
+    'V6017' => 'Payment CurrencyCode Required',
+    'V6018' => 'Unknown Payment CurrencyCode',
+    'V6021' => 'Cardholder Name Required',
+    'V6022' => 'Card Number Required',
+    'V6023' => 'CVN Required',
+    'V6031' => 'Invalid Card Number',
+    'V6032' => 'Invalid CVN',
+    'V6033' => 'Invalid Expiry Date',
+    'V6034' => 'Invalid Issue Number',
+    'V6035' => 'Invalid Start Date',
+    'V6036' => 'Invalid Month',
+    'V6037' => 'Invalid Year',
+    'V6040' => 'Invaild Token Customer Id',
+    'V6041' => 'Customer Required',
+    'V6042' => 'Customer First Name Required',
+    'V6043' => 'Customer Last Name Required',
+    'V6044' => 'Customer Country Code Required',
+    'V6045' => 'Customer Title Required',
+    'V6046' => 'Token Customer ID Required',
+    'V6047' => 'RedirectURL Required',
+    'V6051' => 'Invalid Customer First Name',
+    'V6052' => 'Invalid Customer Last Name',
+    'V6053' => 'Invalid Customer Country Code',
+    'V6054' => 'Invalid Customer Email',
+    'V6055' => 'Invalid Customer Phone',
+    'V6056' => 'Invalid Customer Mobile',
+    'V6057' => 'Invalid Customer Fax',
+    'V6058' => 'Invalid Customer Title',
+    'V6059' => 'Redirect URL Invalid',
+    'V6060' => 'Redirect URL Invalid',
+    'V6061' => 'Invaild Customer Reference',
+    'V6062' => 'Invaild Customer CompanyName',
+    'V6063' => 'Invaild Customer JobDescription',
+    'V6064' => 'Invaild Customer Street1',
+    'V6065' => 'Invaild Customer Street2',
+    'V6066' => 'Invaild Customer City',
+    'V6067' => 'Invaild Customer State',
+    'V6068' => 'Invaild Customer Postalcode',
+    'V6069' => 'Invaild Customer Email',
+    'V6070' => 'Invaild Customer Phone',
+    'V6071' => 'Invaild Customer Mobile',
+    'V6072' => 'Invaild Customer Comments',
+    'V6073' => 'Invaild Customer Fax',
+    'V6074' => 'Invaild Customer Url',
+    'V6075' => 'Invaild ShippingAddress FirstName',
+    'V6076' => 'Invaild ShippingAddress LastName',
+    'V6077' => 'Invaild ShippingAddress Street1',
+    'V6078' => 'Invaild ShippingAddress Street2',
+    'V6079' => 'Invaild ShippingAddress City',
+    'V6080' => 'Invaild ShippingAddress State',
+    'V6081' => 'Invaild ShippingAddress PostalCode',
+    'V6082' => 'Invaild ShippingAddress Email',
+    'V6083' => 'Invaild ShippingAddress Phone',
+    'V6084' => 'Invaild ShippingAddress Country',
+    'V6091' => 'Unknown Country Code',
+    'V6100' => 'Invalid ProcessRequest name',
+    'V6101' => 'Invalid ProcessRequest ExpiryMonth',
+    'V6102' => 'Invalid ProcessRequest ExpiryYear',
+    'V6103' => 'Invalid ProcessRequest StartMonth',
+    'V6104' => 'Invalid ProcessRequest StartYear',
+    'V6105' => 'Invalid ProcessRequest IssueNumber',
+    'V6106' => 'Invalid ProcessRequest CVN',
+    'V6107' => 'Invalid ProcessRequest AccessCode',
+    'V6108' => 'Invalid ProcessRequest CustomerHostAddress',
+    'V6109' => 'Invalid ProcessRequest UserAgent',
+    'V6110' => 'Invalid ProcessRequest Number',
+    'D4401' => 'Refer to Issuer',
+    'D4402' => 'Refer to Issuer, special',
+    'D4403' => 'No Merchant',
+    'D4404' => 'Pick Up Card',
+    'D4405' => 'Do Not Honour',
+    'D4406' => 'Error',
+    'D4407' => 'Pick Up Card, Special',
+    'D4409' => 'Request In Progress',
+    'D4412' => 'Invalid Transaction',
+    'D4413' => 'Invalid Amount',
+    'D4414' => 'Invalid Card Number',
+    'D4415' => 'No Issuer',
+    'D4419' => 'Re-enter Last Transaction',
+    'D4421' => 'No Method Taken',
+    'D4422' => 'Suspected Malfunction',
+    'D4423' => 'Unacceptable Transaction Fee',
+    'D4425' => 'Unable to Locate Record On File',
+    'D4430' => 'Format Error',
+    'D4431' => 'Bank Not Supported By Switch',
+    'D4433' => 'Expired Card, Capture',
+    'D4434' => 'Suspected Fraud, Retain Card',
+    'D4435' => 'Card Acceptor, Contact Acquirer, Retain Card',
+    'D4436' => 'Restricted Card, Retain Card',
+    'D4437' => 'Contact Acquirer Security Department, Retain Card',
+    'D4438' => 'PIN Tries Exceeded, Capture',
+    'D4439' => 'No Credit Account',
+    'D4440' => 'Function Not Supported',
+    'D4441' => 'Lost Card',
+    'D4442' => 'No Universal Account',
+    'D4443' => 'Stolen Card',
+    'D4444' => 'No Investment Account',
+    'D4451' => 'Insufficient Funds',
+    'D4452' => 'No Cheque Account',
+    'D4453' => 'No Savings Account',
+    'D4454' => 'Expired Card',
+    'D4455' => 'Incorrect PIN',
+    'D4456' => 'No Card Record',
+    'D4457' => 'Function Not Permitted to Cardholder',
+    'D4458' => 'Function Not Permitted to Terminal',
+    'D4460' => 'Acceptor Contact Acquirer',
+    'D4461' => 'Exceeds Withdrawal Limit',
+    'D4462' => 'Restricted Card',
+    'D4463' => 'Security Violation',
+    'D4464' => 'Original Amount Incorrect',
+    'D4466' => 'Acceptor Contact Acquirer, Security',
+    'D4467' => 'Capture Card',
+    'D4475' => 'PIN Tries Exceeded',
+    'D4482' => 'CVV Validation Error',
+    'D4490' => 'Cutoff In Progress',
+    'D4491' => 'Card Issuer Unavailable',
+    'D4492' => 'Unable To Route Transaction',
+    'D4493' => 'Cannot Complete, Violation Of The Law',
+    'D4494' => 'Duplicate Transaction',
+    'D4496' => 'System Error',
+  );
+  return isset($messages[$response_code]) ? $messages[$response_code] : FALSE;
 }
